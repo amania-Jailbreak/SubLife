@@ -16,7 +16,7 @@
 		</dict>
 	</array>
 	<key>CatalogAPIBaseURL</key>
-	<string>https://api.example.com</string>
+	<string>https://sublife.amania.jp/</string>
 	<key>CatalogAPITimeout</key>
 	<integer>15</integer>
 	<key>UIUserInterfaceStyle</key>
