@@ -21,6 +21,10 @@ struct AppThemeOption: Identifiable {
     static func color(for id: String) -> Color {
         all.first(where: { $0.id == id })?.color ?? .blue
     }
+
+    static func backgroundId(forThemeId id: String) -> String {
+        all.contains(where: { $0.id == id }) ? id : `default`
+    }
 }
 
 struct AppBackgroundOption: Identifiable {
@@ -30,48 +34,83 @@ struct AppBackgroundOption: Identifiable {
     let bottomColor: Color
     let glowColor: Color
 
-    static let `default` = "midnightBlue"
+    static let `default` = "blue"
 
     static let all: [AppBackgroundOption] = [
         .init(
-            id: "midnightBlue",
-            name: "ミッドナイト",
+            id: "blue",
+            name: "ブルーオーラ",
             topColor: Color(red: 0.08, green: 0.14, blue: 0.3),
             bottomColor: Color(red: 0.01, green: 0.03, blue: 0.12),
             glowColor: .blue
         ),
         .init(
-            id: "forest",
-            name: "フォレスト",
+            id: "teal",
+            name: "ティールミスト",
+            topColor: Color(red: 0.04, green: 0.29, blue: 0.31),
+            bottomColor: Color(red: 0.01, green: 0.09, blue: 0.11),
+            glowColor: .teal
+        ),
+        .init(
+            id: "green",
+            name: "グリーンフォレスト",
             topColor: Color(red: 0.06, green: 0.24, blue: 0.19),
             bottomColor: Color(red: 0.01, green: 0.08, blue: 0.06),
             glowColor: .green
         ),
         .init(
-            id: "sunset",
-            name: "サンセット",
+            id: "orange",
+            name: "オレンジサンセット",
             topColor: Color(red: 0.42, green: 0.18, blue: 0.12),
             bottomColor: Color(red: 0.13, green: 0.04, blue: 0.07),
             glowColor: .orange
         ),
         .init(
-            id: "violetNight",
-            name: "バイオレット",
+            id: "red",
+            name: "レッドネオン",
+            topColor: Color(red: 0.35, green: 0.09, blue: 0.13),
+            bottomColor: Color(red: 0.12, green: 0.02, blue: 0.07),
+            glowColor: .red
+        ),
+        .init(
+            id: "pink",
+            name: "ピンクブロッサム",
+            topColor: Color(red: 0.36, green: 0.14, blue: 0.31),
+            bottomColor: Color(red: 0.11, green: 0.03, blue: 0.13),
+            glowColor: .pink
+        ),
+        .init(
+            id: "purple",
+            name: "パープルナイト",
             topColor: Color(red: 0.24, green: 0.12, blue: 0.36),
             bottomColor: Color(red: 0.06, green: 0.03, blue: 0.14),
             glowColor: .purple
         ),
         .init(
-            id: "graphite",
-            name: "グラファイト",
-            topColor: Color(red: 0.28, green: 0.29, blue: 0.32),
-            bottomColor: Color(red: 0.07, green: 0.08, blue: 0.12),
-            glowColor: .gray
+            id: "indigo",
+            name: "インディゴコスモ",
+            topColor: Color(red: 0.12, green: 0.11, blue: 0.33),
+            bottomColor: Color(red: 0.03, green: 0.02, blue: 0.11),
+            glowColor: .indigo
         )
     ]
 
     static func option(for id: String) -> AppBackgroundOption {
-        all.first(where: { $0.id == id }) ?? all[0]
+        switch id {
+        case "midnightBlue":
+            return option(for: "blue")
+        case "forest":
+            return option(for: "green")
+        case "sunset":
+            return option(for: "orange")
+        case "violetNight":
+            return option(for: "purple")
+        case "graphite":
+            return option(for: "blue")
+        default:
+            break
+        }
+        return all.first(where: { $0.id == id }) ?? all[0]
     }
 }
 

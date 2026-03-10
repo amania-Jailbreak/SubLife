@@ -10,12 +10,13 @@ struct CalendarTabView: View {
     @State private var selectedDate = Calendar.current.startOfDay(for: .now)
 
     private let calendar = Calendar.current
+    private let japaneseLocale = Locale(identifier: "ja_JP")
     private let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
     private let gridSpacing: CGFloat = 6
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 7)
 
     private var monthTitle: String {
-        displayedMonth.formatted(.dateTime.year().month(.wide))
+        displayedMonth.formatted(.dateTime.locale(japaneseLocale).year().month(.wide))
     }
 
     private var monthDays: [Date] {
@@ -115,7 +116,7 @@ struct CalendarTabView: View {
 
     private var selectedDaySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("選択日: \(selectedDate.formatted(date: .abbreviated, time: .omitted))")
+            Text("選択日: \(selectedDate.formatted(.dateTime.locale(japaneseLocale).year().month().day()))")
                 .font(.headline)
 
             if selectedItems.isEmpty {

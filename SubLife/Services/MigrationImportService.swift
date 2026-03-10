@@ -175,6 +175,12 @@ struct MigrationImportService {
             }
             billingMonth = date.month
             billingDay = date.day
+        case .installment:
+            guard let day = parseMonthlyDay(dateRaw) else {
+                throw RecordError.invalidDate
+            }
+            billingMonth = nil
+            billingDay = day
         }
 
         var item = SubscriptionItem(

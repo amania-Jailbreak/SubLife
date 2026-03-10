@@ -4,6 +4,7 @@ struct SubscriptionRow: View {
     let item: SubscriptionItem
     let usdToJpy: Double
     let eurToJpy: Double
+    private let japaneseLocale = Locale(identifier: "ja_JP")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -45,9 +46,30 @@ struct SubscriptionRow: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
 
-            Text("次回請求: \(item.nextChargeDate().formatted(date: .abbreviated, time: .omitted))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if item.billingCycle == .installment {
+                let remainingMonths = item.remainingInstallmentMonths()
+                if remainingMonths > 0 {
+                    Text(
+                        "残り\(remainingMonths)ヶ月・残高 \(item.remainingInstallmentBalance(usdToJpy: usdToJpy, eurToJpy: eurToJpy), format: .currency(code: "JPY"))"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text("完済")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+
+            if item.nextChargeDate() != .distantFuture {
+                Text("次回請求: \(item.nextChargeDate().formatted(.dateTime.locale(japaneseLocale).year().month().day()))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("次回請求: なし")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }

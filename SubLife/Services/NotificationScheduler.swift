@@ -4,8 +4,20 @@ import UserNotifications
 actor NotificationScheduler {
     static let shared = NotificationScheduler()
 
+    private struct NotificationPlan {
+        let reminderDate: Date
+        let chargeDate: Date
+    }
+
     private let center = UNUserNotificationCenter.current()
     private let prefix = "sublife.billing."
+    private let calendar = Calendar.current
+    private let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "MM/dd"
+        return formatter
+    }()
 
     func requestAuthorizationIfNeeded() async {
         let settings = await center.notificationSettings()
@@ -13,7 +25,12 @@ actor NotificationScheduler {
         _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
     }
 
-    func reschedule(items: [SubscriptionItem], leadDays: Int) async {
+    func reschedule(
+        items: [SubscriptionItem],
+        leadDays: Int,
+        notifyOnDueDate: Bool,
+        notifyInAdvance: Bool
+    ) async {
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
@@ -24,51 +41,90 @@ actor NotificationScheduler {
         center.removePendingNotificationRequests(withIdentifiers: managedIds)
 
         for item in items where item.status != .canceled {
-            guard let reminderDate = reminderDate(for: item, leadDays: leadDays) else { continue }
+            if notifyOnDueDate, let duePlan = await dueDatePlan(for: item) {
+                let content = UNMutableNotificationContent()
+                content.title = "\(item.name)のお支払日です!!"
+                content.body = "本日お支払い予定日です"
+                content.sound = .default
 
-            let content = UNMutableNotificationContent()
-            content.title = "サブスクの請求日"
-            content.body = "\(item.name) の請求予定日です（\(formattedAmount(for: item))）"
-            content.sound = .default
+                let components = calendar.dateComponents(
+                    [.year, .month, .day, .hour, .minute],
+                    from: duePlan.reminderDate
+                )
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+                let request = UNNotificationRequest(
+                    identifier: prefix + item.id.uuidString + ".due",
+                    content: content,
+                    trigger: trigger
+                )
+                try? await center.add(request)
+            }
 
-            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminderDate)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: prefix + item.id.uuidString,
-                content: content,
-                trigger: trigger
-            )
+            if notifyInAdvance, leadDays > 0, let advancePlan = await advanceDatePlan(for: item, leadDays: leadDays) {
+                let content = UNMutableNotificationContent()
+                content.title = "\(item.name)のお支払日が迫っています!!"
+                let chargeDay = monthDayFormatter.string(from: advancePlan.chargeDate)
+                content.body = "準備はできましたか? お支払い予定日は\(chargeDay)です"
+                content.sound = .default
 
-            try? await center.add(request)
+                let components = calendar.dateComponents(
+                    [.year, .month, .day, .hour, .minute],
+                    from: advancePlan.reminderDate
+                )
+                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+                let request = UNNotificationRequest(
+                    identifier: prefix + item.id.uuidString + ".advance",
+                    content: content,
+                    trigger: trigger
+                )
+                try? await center.add(request)
+            }
         }
     }
 
-    private func formattedAmount(for item: SubscriptionItem) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = item.effectiveCurrencyCode
-        return formatter.string(from: NSNumber(value: item.price)) ?? "\(item.price)"
-    }
-
-    private func reminderDate(for item: SubscriptionItem, leadDays: Int) -> Date? {
-        let clampedLead = max(0, leadDays)
-        let calendar = Calendar.current
+    private func dueDatePlan(for item: SubscriptionItem) async -> NotificationPlan? {
         let now = Date()
+        var nextCharge = await item.nextChargeDate(from: now, calendar: calendar)
+        guard nextCharge != .distantFuture else { return nil }
+        var dueDate = dateAtNineAM(for: nextCharge)
 
-        var nextCharge = item.nextChargeDate(from: now, calendar: calendar)
-        var reminder = calendar.date(byAdding: .day, value: -clampedLead, to: nextCharge) ?? nextCharge
-
-        if reminder <= now {
+        if dueDate <= now {
             guard let nextCycleReference = calendar.date(byAdding: .day, value: 1, to: nextCharge) else {
                 return nil
             }
-            nextCharge = item.nextChargeDate(from: nextCycleReference, calendar: calendar)
-            reminder = calendar.date(byAdding: .day, value: -clampedLead, to: nextCharge) ?? nextCharge
+            nextCharge = await item.nextChargeDate(from: nextCycleReference, calendar: calendar)
+            guard nextCharge != .distantFuture else { return nil }
+            dueDate = dateAtNineAM(for: nextCharge)
+        }
+        return NotificationPlan(reminderDate: dueDate, chargeDate: nextCharge)
+    }
+
+    private func advanceDatePlan(for item: SubscriptionItem, leadDays: Int) async -> NotificationPlan? {
+        let clampedLead = max(1, leadDays)
+        let now = Date()
+
+        var nextCharge = await item.nextChargeDate(from: now, calendar: calendar)
+        guard nextCharge != .distantFuture else { return nil }
+        var reminder = calendar.date(byAdding: .day, value: -clampedLead, to: nextCharge) ?? nextCharge
+        reminder = dateAtNineAM(for: reminder)
+
+        guard reminder <= now else {
+            return NotificationPlan(reminderDate: reminder, chargeDate: nextCharge)
         }
 
-        var components = calendar.dateComponents([.year, .month, .day], from: reminder)
+        guard let nextCycleReference = calendar.date(byAdding: .day, value: 1, to: nextCharge) else {
+            return nil
+        }
+        nextCharge = await item.nextChargeDate(from: nextCycleReference, calendar: calendar)
+        guard nextCharge != .distantFuture else { return nil }
+        let nextReminder = calendar.date(byAdding: .day, value: -clampedLead, to: nextCharge) ?? nextCharge
+        return NotificationPlan(reminderDate: dateAtNineAM(for: nextReminder), chargeDate: nextCharge)
+    }
+
+    private func dateAtNineAM(for source: Date) -> Date {
+        var components = calendar.dateComponents([.year, .month, .day], from: source)
         components.hour = 9
         components.minute = 0
-        return calendar.date(from: components)
+        return calendar.date(from: components) ?? source
     }
 }

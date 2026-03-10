@@ -15,5 +15,11 @@
 			</array>
 		</dict>
 	</array>
+	<key>CatalogAPIBaseURL</key>
+	<string>https://api.example.com</string>
+	<key>CatalogAPITimeout</key>
+	<integer>15</integer>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 </dict>
 </plist>
